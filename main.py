@@ -16,6 +16,7 @@ from collections import OrderedDict
 
 import barcode as python_barcode
 from barcode.writer import ImageWriter
+import qrcode
 from PIL import Image, ImageWin
 import win32con
 import win32print
@@ -51,39 +52,60 @@ BARCODE_IMAGE_CACHE = OrderedDict()
 BARCODE_IMAGE_CACHE_MAXSIZE = 100
 
 
-def generate_label_image(barcode_text: str) -> Image.Image:
-    """Generate a label image with a barcode for the given text.
+def generate_label_image(barcode_text: str, code_type: str = "barcode") -> Image.Image:
+    """Generate a label image with a barcode or QR code for the given text.
 
     Uses LRU cache for performance optimization.
 
     Args:
-        barcode_text: The text to encode in the barcode.
+        barcode_text: The text to encode in the barcode/QR code.
+        code_type: Type of code to generate - "barcode" or "qrcode".
 
     Returns:
-        PIL Image object containing the barcode label.
+        PIL Image object containing the barcode/QR code label.
     """
-    if barcode_text in BARCODE_IMAGE_CACHE:
+    cache_key = f"{code_type}:{barcode_text}"
+
+    if cache_key in BARCODE_IMAGE_CACHE:
         # Move to end to mark as recently used
-        BARCODE_IMAGE_CACHE.move_to_end(barcode_text)
-        return BARCODE_IMAGE_CACHE[barcode_text].copy()
+        BARCODE_IMAGE_CACHE.move_to_end(cache_key)
+        return BARCODE_IMAGE_CACHE[cache_key].copy()
 
-    # Generate barcode using python-barcode
-    code128 = python_barcode.get("code128", barcode_text, writer=ImageWriter())
-    with io.BytesIO() as buffer:
-        code128.write(buffer)
-        buffer.seek(0)
-        barcode_img = Image.open(buffer).copy()
+    if code_type == "qrcode":
+        # Generate QR code
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(barcode_text)
+        qr.make(fit=True)
+        code_img = qr.make_image(fill_color="black", back_color="white")
+        # Convert to PIL Image if needed
+        if not isinstance(code_img, Image.Image):
+            code_img = code_img.convert("RGB")
+    else:
+        # Generate barcode using python-barcode
+        code128 = python_barcode.get("code128", barcode_text, writer=ImageWriter())
+        with io.BytesIO() as buffer:
+            code128.write(buffer)
+            buffer.seek(0)
+            code_img = Image.open(buffer).copy()
 
-    # Create a white label and center the barcode on it
+    # Create a white label and center the code on it
     label_width, label_height = 600, 300
     label_img = Image.new("RGB", (label_width, label_height), 0xFFFFFF)
-    barcode_x = (label_width - barcode_img.width) // 2
-    barcode_y = (label_height - barcode_img.height) // 2
-    label_img.paste(barcode_img, (barcode_x, barcode_y))
+
+    # Get the size of the code image
+    code_width, code_height = code_img.size
+    code_x = (label_width - code_width) // 2
+    code_y = (label_height - code_height) // 2
+    label_img.paste(code_img, (code_x, code_y))
 
     # Add to cache and enforce max size
-    BARCODE_IMAGE_CACHE[barcode_text] = label_img.copy()
-    BARCODE_IMAGE_CACHE.move_to_end(barcode_text)
+    BARCODE_IMAGE_CACHE[cache_key] = label_img.copy()
+    BARCODE_IMAGE_CACHE.move_to_end(cache_key)
     if len(BARCODE_IMAGE_CACHE) > BARCODE_IMAGE_CACHE_MAXSIZE:
         BARCODE_IMAGE_CACHE.popitem(last=False)
 
@@ -237,6 +259,23 @@ def main(page: ft.Page):
         page.theme_mode = ft.ThemeMode.LIGHT
 
     # UI Components
+
+    barcode_chooser = ft.SegmentedButton(
+        selected=["1"],
+        segments=[
+            ft.Segment(
+                value="1",
+                label=ft.Text("Barcode"),
+                icon=ft.Icon(ft.CupertinoIcons.BARCODE),
+            ),
+            ft.Segment(
+                value="2",
+                label=ft.Text("QR Code"),
+                icon=ft.Icon(ft.CupertinoIcons.QRCODE),
+            ),
+        ],
+    )
+
     barcode_text = ft.TextField(
         label="Enter or Scan Barcode",
         width=500,
@@ -296,24 +335,31 @@ def main(page: ft.Page):
         page.update()
 
     def show_preview(e):
-        """Generate and display barcode preview."""
+        """Generate and display barcode/QR code preview."""
         if not barcode_text.value:
             preview_image.visible = False
             page.update()
             return
-        pil_img = generate_label_image(barcode_text.value)
+
+        # Get selected code type from segmented button
+        code_type = "qrcode" if "2" in barcode_chooser.selected else "barcode"
+        pil_img = generate_label_image(barcode_text.value, code_type)
         b64_string = pil_to_base64(pil_img)
         preview_image.src = b64_string
         preview_image.visible = True
         page.update()
 
     async def handle_print(e):
-        """Print the barcode and reset the form."""
+        """Print the barcode/QR code and reset the form."""
         if not barcode_text.value:
             await barcode_text.focus()
             return
 
-        print_image(generate_label_image(barcode_text.value), printer_dropdown.value)
+        # Get selected code type from segmented button
+        code_type = "qrcode" if "2" in barcode_chooser.selected else "barcode"
+        print_image(
+            generate_label_image(barcode_text.value, code_type), printer_dropdown.value
+        )
 
         # Save to history
         save_history_entry(barcode_text.value, printer_dropdown.value)
@@ -463,6 +509,7 @@ def main(page: ft.Page):
             # Foreground content layer
             ft.Column(
                 controls=[
+                    barcode_chooser,
                     printer_dropdown,
                     barcode_text,
                     ft.Row(
