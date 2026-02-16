@@ -433,7 +433,7 @@ def main(page: ft.Page):
         actions=[
             theme_button,
             ft.IconButton(
-                icon=ft.Icons.SAVE_ROUNDED,
+                icon=ft.CupertinoIcons.FLOPPY_DISK,
                 on_click=handle_save_settings,
                 tooltip="Save Settings",
             ),
