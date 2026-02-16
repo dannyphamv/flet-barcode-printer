@@ -9,7 +9,7 @@ A modern, user-friendly desktop application for generating and printing Code128 
 - 🎯 **Simple Interface** - Clean, intuitive design for quick barcode printing
 - ⌨️ **Barcode Scanner Support** - Scan barcodes directly with USB/Bluetooth scanners
 - 🖨️ **Multi-Printer Support** - Select from any installed Windows printer
-- 👁️ **Live Preview** - See your barcode before printing
+- 👁️ **Preview** - See your barcode before printing
 - 📊 **Print History** - Track all printed barcodes with timestamps
 - 🎨 **Dark/Light Mode** - Choose your preferred theme
 - 💾 **Settings Persistence** - Remembers your printer and theme preferences
@@ -17,23 +17,18 @@ A modern, user-friendly desktop application for generating and printing Code128 
 - 🎯 **Auto-Focus** - Always ready for the next scan
 
 ## 📸 Screenshot
-![alt text](screenshot.png)
+
+![Screenshot of Barcode Printer](screenshot.avif)
 
 ## 🚀 Quick Start
-
-### Prerequisites
-
-- Windows 7 or later
-- Python 3.8 or higher
-- At least one printer installed
 
 ### Installation
 
 1. **Clone or download this repository**
 
    ```bash
-   git clone https://github.com/yourusername/barcode-printer.git
-   cd barcode-printer
+   git clone https://github.com/dannyphamv/flet-barcode-printer.git
+   cd flet-barcode-printer
    ```
 
 2. **Install dependencies**
@@ -46,13 +41,20 @@ A modern, user-friendly desktop application for generating and printing Code128 
    ```bash
    python main.py
    ```
+   **Or launch from .bat file**
+   ```bash
+   run.bat
+   ```
 
 ## 📁 Project Structure
 
 ```
-barcode-printer/
-├── main.py                 # Main application file (all-in-one)
-├── requirements.txt       # Python dependencies
+flet-barcode-printer/
+├── main.py               # Main application file
+├── requirements.txt      # Python dependencies
+├── run.bat               # Launch the application via the run.bat file
+├── barcode-scan.ico      # Title bar icon
+├── screenshot.png        # Screenshot of application
 ├── README.md             # This file
 └── LICENSE               # License file
 ```
@@ -78,5 +80,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [python-barcode](https://github.com/WhyNotHugo/python-barcode) - Barcode generation
 - [Pillow](https://python-pillow.org/) - Image processing
 - [pywin32](https://github.com/mhammond/pywin32) - Windows API access
+- [Vectorslab - Flaticon](https://www.flaticon.com/free-icons/barcode) - Free icons
 
 **Made with ❤️ using Python and Flet**

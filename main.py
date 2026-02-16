@@ -222,6 +222,8 @@ def main(page: ft.Page):
     page.window.min_height = 700
     page.window.width = 600
     page.window.height = 700
+    icon_path = os.path.abspath("barcode-scan.ico")
+    page.window.icon = icon_path
     page.title = "Barcode Printer"
 
     # Navigation state
