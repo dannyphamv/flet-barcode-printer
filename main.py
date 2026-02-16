@@ -8,6 +8,7 @@ from pathlib import Path
 from datetime import datetime
 
 import flet as ft
+import flet_datatable2 as ftd
 
 import io
 import logging
@@ -348,7 +349,7 @@ def main(page: ft.Page):
             formatted_time = timestamp.strftime("%m/%d/%Y %I:%M %p")
 
             rows.append(
-                ft.DataRow(
+                ftd.DataRow2(
                     cells=[
                         ft.DataCell(ft.Text(entry["barcode"], selectable=True)),
                         ft.DataCell(ft.Text(entry["printer"], selectable=True)),
@@ -359,11 +360,16 @@ def main(page: ft.Page):
 
         return ft.Column(
             [
-                ft.DataTable(
+                ftd.DataTable2(
+                    show_checkbox_column=True,
+                    expand=True,
+                    column_spacing=0,
+                    heading_row_color=ft.Colors.SECONDARY_CONTAINER,
+                    min_width=500,
                     columns=[
-                        ft.DataColumn(ft.Text("Barcode")),
-                        ft.DataColumn(ft.Text("Printer")),
-                        ft.DataColumn(ft.Text("Date & Time")),
+                        ftd.DataColumn2(ft.Text("Barcode"), size="l"),
+                        ftd.DataColumn2(ft.Text("Printer"), size="m"),
+                        ftd.DataColumn2(ft.Text("Date & Time"), size="m"),
                     ],
                     rows=rows,
                 ),
@@ -423,7 +429,7 @@ def main(page: ft.Page):
     # Page Layout
 
     page.appbar = ft.AppBar(
-        title=ft.Text("🖨️ Barcode Printer"),
+        title=ft.Text("Barcode Printer"),
         actions=[
             theme_button,
             ft.IconButton(
@@ -432,6 +438,7 @@ def main(page: ft.Page):
                 tooltip="Save Settings",
             ),
         ],
+        actions_padding=5,
         bgcolor=ft.Colors.SURFACE_CONTAINER,
     )
 
