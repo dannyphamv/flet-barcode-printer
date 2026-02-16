@@ -3,6 +3,7 @@
 
 # GUI Framework
 flet>=0.24.0
+flet-datatable2>=0.80.5
 
 # Barcode Generation
 python-barcode[images]>=0.15.1

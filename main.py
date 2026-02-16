@@ -223,8 +223,7 @@ def main(page: ft.Page):
     page.window.min_height = 700
     page.window.width = 600
     page.window.height = 700
-    icon_path = os.path.abspath("barcode-scan.ico")
-    page.window.icon = icon_path
+    page.window.icon = os.path.abspath("barcode-scan.ico")
     page.title = "Barcode Printer"
 
     # Navigation state
@@ -242,7 +241,7 @@ def main(page: ft.Page):
         label="Enter or Scan Barcode",
         width=500,
         autofocus=True,
-        border_color=ft.Colors.BLUE,
+        border_color=ft.Colors.PRIMARY,
     )
 
     preview_image = ft.Image(src="", width=300, visible=False, border_radius=5)
@@ -257,7 +256,7 @@ def main(page: ft.Page):
         width=500,
         value=default_printer,
         options=[ft.dropdown.Option(p) for p in printers],
-        border_color=ft.Colors.BLUE,
+        border_color=ft.Colors.PRIMARY,
     )
 
     # Event Handlers
@@ -330,7 +329,6 @@ def main(page: ft.Page):
         await barcode_text.focus()
 
     def build_history_table():
-        """Build the history table view."""
         history = load_history()
 
         if not history:
@@ -350,21 +348,21 @@ def main(page: ft.Page):
 
             rows.append(
                 ftd.DataRow2(
+                    selected=False,
                     cells=[
                         ft.DataCell(ft.Text(entry["barcode"], selectable=True)),
                         ft.DataCell(ft.Text(entry["printer"], selectable=True)),
                         ft.DataCell(ft.Text(formatted_time, selectable=True)),
-                    ]
+                    ],
                 )
             )
 
         return ft.Column(
             [
                 ftd.DataTable2(
-                    show_checkbox_column=True,
                     expand=True,
                     column_spacing=0,
-                    heading_row_color=ft.Colors.SECONDARY_CONTAINER,
+                    heading_row_color=ft.Colors.PRIMARY_CONTAINER,
                     min_width=500,
                     columns=[
                         ftd.DataColumn2(ft.Text("Barcode"), size="l"),
@@ -424,7 +422,9 @@ def main(page: ft.Page):
     else:
         initial_icon = ft.CupertinoIcons.SUN_MAX_FILL
 
-    theme_button = ft.IconButton(icon=initial_icon, on_click=toggle_theme)
+    theme_button = ft.IconButton(
+        icon=initial_icon, on_click=toggle_theme, tooltip="Toggle Theme"
+    )
 
     # Page Layout
 
@@ -433,7 +433,7 @@ def main(page: ft.Page):
         actions=[
             theme_button,
             ft.IconButton(
-                icon=ft.CupertinoIcons.FLOPPY_DISK,
+                icon=ft.Icons.SAVE_ROUNDED,
                 on_click=handle_save_settings,
                 tooltip="Save Settings",
             ),
@@ -478,7 +478,7 @@ def main(page: ft.Page):
                                 width=245,
                                 height=50,
                                 content=ft.Text("Print Barcode"),
-                                icon=ft.CupertinoIcons.PRINTER_FILL,
+                                icon=ft.Icons.PRINT_ROUNDED,
                                 on_click=handle_print,
                             ),
                         ],
