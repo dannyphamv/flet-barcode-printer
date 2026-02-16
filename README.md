@@ -16,7 +16,7 @@ A modern, user-friendly desktop application for generating and printing Code128 
 - ⚡ **Performance Optimized** - Smart caching for instant barcode generation
 - 🎯 **Auto-Focus** - Always ready for the next scan
 
-## 📸 Screenshot
+## 📸 Screenshots
 
 ![Screenshot of Barcode Printer](screenshot.avif)
 
