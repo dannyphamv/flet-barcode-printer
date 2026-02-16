@@ -239,6 +239,7 @@ def main(page: ft.Page):
         label="Enter or Scan Barcode",
         width=500,
         autofocus=True,
+        border_color=ft.Colors.BLUE,
     )
 
     preview_image = ft.Image(src="", width=300, visible=False, border_radius=5)
@@ -253,6 +254,7 @@ def main(page: ft.Page):
         width=500,
         value=default_printer,
         options=[ft.dropdown.Option(p) for p in printers],
+        border_color=ft.Colors.BLUE,
     )
 
     # Event Handlers
