@@ -54,7 +54,6 @@ flet-barcode-printer/
 ├── requirements.txt      # Python dependencies
 ├── run.bat               # Launch the application via the run.bat file
 ├── barcode-scan.ico      # Title bar icon
-├── screenshot.png        # Screenshot of application
 ├── README.md             # This file
 └── LICENSE               # License file
 ```
