@@ -22,6 +22,9 @@ from PIL import Image, ImageWin
 import win32con
 import win32print
 import win32ui
+import ctypes
+
+ctypes.windll.shcore.SetProcessDpiAwareness(2)  # PROCESS_PER_MONITOR_DPI_AWARE
 
 
 @dataclass
