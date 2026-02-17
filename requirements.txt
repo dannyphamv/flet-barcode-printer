@@ -2,15 +2,15 @@
 # Python 3.9+ required (for modern typing features and threading improvements)
 
 # GUI Framework
-flet>=0.24.0
+flet>=0.80.5
 flet-datatable2>=0.80.5
 
 # Barcode Generation
-python-barcode[images]>=0.15.1
-qrcode[pil]>=0.4.6
+python-barcode[images]>=0.16.1
+qrcode[pil]>=8.2
 
 # Image Processing
-Pillow>=10.0.0
+Pillow>=12.1.1
 
 # Windows Printer Integration (Windows only)
-pywin32>=306
+pywin32>=311

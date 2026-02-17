@@ -11,18 +11,23 @@ A modern, production-ready desktop application for generating and printing Code1
 - 🖨️ **Multi-Printer Support** - Select from any installed Windows printer
 - 👁️ **Live Preview** - See your barcode/QR code before printing with async generation
 - 📊 **Print History** - Track all printed codes with timestamps and type indicators
+- 🔁 **One-Click Reprint** - Tap any history entry to copy it to the clipboard and text field, ready to reprint instantly
+- 🗑️ **Clear History** - Contextual floating action button appears when history has entries to clear it in one tap
+- 🏷️ **Dynamic Print Button** - Button label updates to "Print Barcode" or "Print QR Code" based on the selected code type
 - 🎨 **Dark/Light Mode** - Choose your preferred theme with persistent settings
 - 💾 **Settings Persistence** - Remembers your printer and theme preferences with atomic file writes
 
 ### Technical Features
 - ⚡ **Performance Optimized** - LRU cache with thread-safe access for instant code generation
-- 🎯 **Auto-Focus** - Always ready for the next scan with smart focus management
+- 🎯 **Auto-Focus** - Automatically re-focuses the input field on window focus and background click, always ready for the next scan
 - 🧵 **Threaded Printing** - Non-blocking print operations keep UI responsive
 - 📏 **Smart Scaling** - Auto-scales to 4 inches or page width, handles both dimensions
 - 🔒 **Thread-Safe** - Proper locking for concurrent operations
-- 💪 **Robust Error Handling** - Graceful handling of printer failures and invalid input
-- 🎚️ **Progress Indicator** - Visual progress bar for print operations
+- 💪 **Robust Error Handling** - Graceful handling of printer failures and invalid input with backward-compatible history entries
+- 🎚️ **Progress Indicator** - Visual indeterminate progress bar during print with delayed auto-hide via `threading.Timer`
 - 📐 **DPI Aware Printing** - Adapts to any printer resolution (300, 600, 1200+ DPI)
+- 🖥️ **Per-Monitor DPI Aware** - Display renders sharply on high-DPI and multi-monitor setups via `SetProcessDpiAwareness`
+- 🪟 **Minimum Window Size** - Enforces a 700×700px minimum to prevent layout breakage
 
 ## 📸 Screenshots
 
@@ -66,6 +71,7 @@ A modern, production-ready desktop application for generating and printing Code1
 3. **Preview** (Optional) - Click Preview to see the generated code
 4. **Select Printer** - Choose your target printer from the dropdown
 5. **Print** - Click Print or press Enter
+6. **Reprint** - In the History tab, tap any row to copy the data to your clipboard and jump back to the Print tab ready to go
 
 The app automatically:
 - Generates high-quality codes optimized for 4-inch printing
@@ -78,10 +84,10 @@ The app automatically:
 
 ```
 flet-barcode-printer/
-├── main.py               # Main application (850+ lines, production-ready)
+├── main.py               # Main application (900+ lines, production-ready)
 ├── requirements.txt      # Python dependencies
 ├── run.bat               # Windows launcher
-├── barcode-scan.ico      # Application icon
+├── favicon.ico           # Application icon
 ├── README.md             # This file
 └── LICENSE               # MIT License
 ```
@@ -90,12 +96,12 @@ flet-barcode-printer/
 
 | Package                | Version  | Purpose              |
 | ---------------------- | -------- | -------------------- |
-| flet                   | >=0.24.0 | Modern GUI framework        |
+| flet                   | >=0.80.5 | Modern GUI framework        |
 | flet-datatable2        | >=0.80.5 | Enhanced data tables |
-| python-barcode[images] | >=0.15.1 | Code128 barcode generation   |
-| qrcode                 | >=0.4.6  | QR code generation   |
-| Pillow                 | >=10.0.0 | Image processing & LANCZOS resampling    |
-| pywin32                | >=306    | Windows printer APIs |
+| python-barcode[images] | >=0.16.1 | Code128 barcode generation   |
+| qrcode[pil]            | >=8.2    | QR code generation   |
+| Pillow                 | >=12.1.1 | Image processing & LANCZOS resampling    |
+| pywin32                | >=311    | Windows printer APIs |
 
 See [requirements.txt](requirements.txt) for exact versions.
 
@@ -105,12 +111,13 @@ See [requirements.txt](requirements.txt) for exact versions.
 - **Main Thread**: Flet UI event loop
 - **Background Threads**: Print operations run in daemon threads
 - **Thread Safety**: `threading.Lock` protects LRU cache, `page.run_thread()` for UI updates
-- **Non-blocking**: `threading.Timer` for delayed operations instead of `time.sleep()`
+- **Non-blocking**: `threading.Timer` for delayed progress bar hide instead of `time.sleep()`
 
 ### Data Persistence
 - **Atomic Writes**: Uses `tempfile.mkstemp()` + `os.replace()` to prevent corruption
 - **JSON Storage**: Settings and history stored in `%APPDATA%/BarcodePrinter/`
 - **Graceful Degradation**: Handles corrupted files by returning defaults
+- **Backward-Compatible History**: Old entries without a `code_type` field default to barcode automatically
 
 ### Print Quality
 - **DPI Detection**: Queries printer capabilities via `GetDeviceCaps()`
