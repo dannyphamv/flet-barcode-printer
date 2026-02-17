@@ -1,5 +1,5 @@
 # Barcode Printer Application Requirements
-# Python 3.8+ required
+# Python 3.9+ required (for modern typing features and threading improvements)
 
 # GUI Framework
 flet>=0.24.0
@@ -7,7 +7,7 @@ flet-datatable2>=0.80.5
 
 # Barcode Generation
 python-barcode[images]>=0.15.1
-qrcode>=0.4.6
+qrcode[pil]>=0.4.6
 
 # Image Processing
 Pillow>=10.0.0
