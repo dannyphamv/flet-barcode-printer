@@ -675,8 +675,8 @@ def main(page: ft.Page) -> None:
                     cells=[
                         ft.DataCell(ft.Text(type_text)),
                         ft.DataCell(ft.Text(entry["barcode"], selectable=True)),
-                        ft.DataCell(ft.Text(entry["printer"], selectable=True)),
-                        ft.DataCell(ft.Text(formatted_time, selectable=True)),
+                        ft.DataCell(ft.Text(entry["printer"])),
+                        ft.DataCell(ft.Text(formatted_time)),
                     ],
                 )
             )
