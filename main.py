@@ -3,14 +3,18 @@
 import json
 import os
 import base64
+import threading
+import tempfile
+import time
 from io import BytesIO
 from pathlib import Path
 from datetime import datetime
+from dataclasses import dataclass
+from functools import lru_cache
+from typing import Optional
 
 import flet as ft
 import flet_datatable2 as ftd
-
-from collections import OrderedDict
 
 import barcode as python_barcode
 from barcode.writer import ImageWriter
@@ -21,43 +25,94 @@ import win32print
 import win32ui
 
 
-# Configuration Constants
+@dataclass
+class PrintConfig:
+    """Configuration constants for barcode printing."""
+
+    width_inches: int = 4
+    qr_box_size: int = 20
+    qr_border: int = 4
+    cache_max_size: int = 100
+    history_max_entries: int = 100
+
+
+# Global configuration instance
+CONFIG = PrintConfig()
+
+# Configuration Constants (for backwards compatibility)
 CODE_TYPE_BARCODE = "barcode"
 CODE_TYPE_QRCODE = "qrcode"
 QRCODE_SELECTOR_VALUE = "2"
-PRINT_WIDTH_INCHES = 4
-QR_BOX_SIZE = 20  # For 4-inch printing at 300 DPI
-QR_BORDER = 4
-BARCODE_CACHE_MAX_SIZE = 100
-HISTORY_MAX_ENTRIES = 100
 
 
 # Printer List Cache
-_PRINTER_LIST_CACHE = None
+_PRINTER_LIST_CACHE: Optional[list[str]] = None
+
+# Thread lock for cache safety
+_CACHE_LOCK = threading.Lock()
 
 
-def get_printers(force_refresh=False) -> list[str]:
+def get_printers(force_refresh: bool = False) -> list[str]:
     """Return a list of available printer names.
 
     Args:
         force_refresh: If True, refresh the cache even if it exists.
 
     Returns:
-        List of available printer names.
+        List of available printer names. Returns empty list if enumeration fails.
     """
     global _PRINTER_LIST_CACHE
     if force_refresh or _PRINTER_LIST_CACHE is None:
-        _PRINTER_LIST_CACHE = [
-            printer[2]
-            for printer in win32print.EnumPrinters(
-                win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS
-            )
-        ]
+        try:
+            _PRINTER_LIST_CACHE = [
+                printer[2]
+                for printer in win32print.EnumPrinters(
+                    win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS
+                )
+            ]
+        except Exception:
+            # Print spooler might be down or no printers installed
+            _PRINTER_LIST_CACHE = []
     return _PRINTER_LIST_CACHE
 
 
-# Barcode Image Cache (LRU cache)
-BARCODE_IMAGE_CACHE = OrderedDict()
+@lru_cache(maxsize=100)
+def _generate_label_image_cached(
+    barcode_text: str, code_type: str = CODE_TYPE_BARCODE
+) -> Image.Image:
+    """Internal cached image generation function.
+
+    This function is wrapped by generate_label_image() with thread safety.
+    """
+    if code_type == CODE_TYPE_QRCODE:
+        try:
+            # Generate QR code with larger box_size for 4-inch printing
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=CONFIG.qr_box_size,
+                border=CONFIG.qr_border,
+            )
+            qr.add_data(barcode_text)
+            qr.make(fit=True)
+            code_img = qr.make_image(fill_color="black", back_color="white")
+            # Convert to PIL Image if needed
+            if not isinstance(code_img, Image.Image):
+                code_img = code_img.convert("RGB")
+
+            return code_img
+        except Exception as e:
+            raise ValueError(f"Failed to generate QR code: {str(e)}")
+    else:
+        try:
+            # Generate barcode using python-barcode
+            code128 = python_barcode.get("code128", barcode_text, writer=ImageWriter())
+            with BytesIO() as buffer:
+                code128.write(buffer)
+                buffer.seek(0)
+                return Image.open(buffer).copy()
+        except Exception as e:
+            raise ValueError(f"Failed to generate barcode: {str(e)}")
 
 
 def generate_label_image(
@@ -65,7 +120,7 @@ def generate_label_image(
 ) -> Image.Image:
     """Generate a label image with a barcode or QR code for the given text.
 
-    Uses LRU cache for performance optimization.
+    Uses LRU cache for performance optimization with thread safety.
 
     Args:
         barcode_text: The text to encode in the barcode/QR code.
@@ -73,46 +128,16 @@ def generate_label_image(
 
     Returns:
         PIL Image object containing the barcode/QR code label.
+
+    Raises:
+        ValueError: If barcode_text is empty or contains invalid characters.
     """
-    cache_key = f"{code_type}:{barcode_text}"
+    if not barcode_text or not barcode_text.strip():
+        raise ValueError("Barcode text cannot be empty")
 
-    if cache_key in BARCODE_IMAGE_CACHE:
-        # Move to end to mark as recently used
-        BARCODE_IMAGE_CACHE.move_to_end(cache_key)
-        return BARCODE_IMAGE_CACHE[cache_key].copy()
-
-    if code_type == CODE_TYPE_QRCODE:
-        # Generate QR code with larger box_size for 4-inch printing
-        qr = qrcode.QRCode(
-            version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_L,
-            box_size=QR_BOX_SIZE,
-            border=QR_BORDER,
-        )
-        qr.add_data(barcode_text)
-        qr.make(fit=True)
-        code_img = qr.make_image(fill_color="black", back_color="white")
-        # Convert to PIL Image if needed
-        if not isinstance(code_img, Image.Image):
-            code_img = code_img.convert("RGB")
-
-        label_img = code_img
-    else:
-        # Generate barcode using python-barcode
-        # Returns directly without label wrapper for full 4-inch width printing
-        code128 = python_barcode.get("code128", barcode_text, writer=ImageWriter())
-        with BytesIO() as buffer:
-            code128.write(buffer)
-            buffer.seek(0)
-            label_img = Image.open(buffer).copy()
-
-    # Add to cache and enforce max size
-    BARCODE_IMAGE_CACHE[cache_key] = label_img.copy()
-    BARCODE_IMAGE_CACHE.move_to_end(cache_key)
-    if len(BARCODE_IMAGE_CACHE) > BARCODE_CACHE_MAX_SIZE:
-        BARCODE_IMAGE_CACHE.popitem(last=False)
-
-    return label_img
+    # Thread-safe cache access
+    with _CACHE_LOCK:
+        return _generate_label_image_cached(barcode_text, code_type)
 
 
 def print_image(img: Image.Image, printer_name: str) -> None:
@@ -124,13 +149,28 @@ def print_image(img: Image.Image, printer_name: str) -> None:
 
     Raises:
         RuntimeError: If printer device context cannot be created.
+        ValueError: If printer_name is invalid or not found.
         Exception: If printing fails for any other reason.
     """
+    if not printer_name:
+        raise ValueError("Printer name cannot be empty")
+
+    # Validate printer exists
+    available_printers = get_printers()
+    if printer_name not in available_printers:
+        raise ValueError(f"Printer '{printer_name}' not found")
+
     pdc = win32ui.CreateDC()
     if pdc is None:
-        raise RuntimeError("Failed to create printer device context.")
+        raise RuntimeError("Failed to create printer device context")
 
-    pdc.CreatePrinterDC(printer_name)
+    try:
+        pdc.CreatePrinterDC(printer_name)
+    except Exception as e:
+        raise RuntimeError(
+            f"Failed to create printer DC for '{printer_name}': {str(e)}"
+        )
+
     try:
         pdc.StartDoc("Barcode Print")
         pdc.StartPage()
@@ -140,12 +180,18 @@ def print_image(img: Image.Image, printer_name: str) -> None:
         printable_height = pdc.GetDeviceCaps(win32con.VERTRES)
         printer_dpi = pdc.GetDeviceCaps(win32con.LOGPIXELSX)
 
-        # Scale to configured width OR page width, whichever is smaller
-        max_width = int(PRINT_WIDTH_INCHES * printer_dpi)
-        target_width = min(max_width, printable_width)
-
+        # Calculate target dimensions based on configured width
+        max_width = int(CONFIG.width_inches * printer_dpi)
         aspect_ratio = img.height / img.width
+
+        # Start with desired width, then check both dimensions
+        target_width = min(max_width, printable_width)
         target_height = int(target_width * aspect_ratio)
+
+        # If height overflows, scale down based on height instead
+        if target_height > printable_height:
+            target_height = printable_height
+            target_width = int(target_height / aspect_ratio)
 
         # Resize image with high-quality resampling
         img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
@@ -162,7 +208,7 @@ def print_image(img: Image.Image, printer_name: str) -> None:
         pdc.EndPage()
         pdc.EndDoc()
     except Exception as exc:
-        raise
+        raise Exception(f"Print operation failed: {str(exc)}")
     finally:
         pdc.DeleteDC()
 
@@ -173,7 +219,7 @@ SETTINGS_FILE = APPDATA_DIR / "settings.json"
 HISTORY_FILE = APPDATA_DIR / "history.json"
 
 
-def ensure_appdata_dir():
+def ensure_appdata_dir() -> None:
     """Create AppData directory if it doesn't exist."""
     APPDATA_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -188,39 +234,57 @@ def load_json_file(filepath: Path, default=None):
     Returns:
         Loaded data or default value.
     """
-    if filepath.exists():
-        try:
-            with open(filepath, "r") as f:
-                return json.load(f)
-        except Exception:
-            return default
-    return default
+    if not filepath.exists():
+        return default
+
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError) as e:
+        # Return default if file is corrupted or unreadable
+        return default
 
 
-def save_json_file(filepath: Path, data):
-    """Save data to a JSON file.
+def save_json_file(filepath: Path, data) -> None:
+    """Save data to a JSON file atomically.
 
     Args:
         filepath: Path to the JSON file.
         data: Data to save (must be JSON serializable).
     """
     ensure_appdata_dir()
-    with open(filepath, "w") as f:
-        json.dump(data, f, indent=2)
+
+    # Write to temporary file first, then rename (atomic operation)
+    temp_fd, temp_path = tempfile.mkstemp(dir=APPDATA_DIR, suffix=".json", text=True)
+    try:
+        with os.fdopen(temp_fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+
+        # Atomic rename
+        os.replace(temp_path, filepath)
+    except Exception:
+        # Clean up temp file if something went wrong
+        try:
+            os.unlink(temp_path)
+        except:
+            pass
+        raise
 
 
-def save_settings(printer, theme_mode):
+def save_settings(printer: str, theme_mode) -> None:
     """Save printer and theme mode settings to JSON file."""
     settings = {"printer": printer, "theme_mode": theme_mode.value}
     save_json_file(SETTINGS_FILE, settings)
 
 
-def load_settings():
+def load_settings() -> Optional[dict]:
     """Load settings from JSON file if it exists."""
     return load_json_file(SETTINGS_FILE)
 
 
-def save_history_entry(barcode_text, printer_name, code_type=CODE_TYPE_BARCODE):
+def save_history_entry(
+    barcode_text: str, printer_name: str, code_type: str = CODE_TYPE_BARCODE
+) -> None:
     """Save a print history entry.
 
     Args:
@@ -240,17 +304,17 @@ def save_history_entry(barcode_text, printer_name, code_type=CODE_TYPE_BARCODE):
     history.insert(0, entry)  # Add to beginning
 
     # Keep only last N entries
-    history = history[:HISTORY_MAX_ENTRIES]
+    history = history[: CONFIG.history_max_entries]
 
     save_json_file(HISTORY_FILE, history)
 
 
-def load_history():
+def load_history() -> list[dict]:
     """Load print history from JSON file."""
     return load_json_file(HISTORY_FILE, default=[])
 
 
-def clear_history():
+def clear_history() -> None:
     """Clear all print history entries."""
     save_json_file(HISTORY_FILE, [])
 
@@ -283,12 +347,13 @@ def get_code_type_display(code_type: str) -> str:
     return "QR Code" if code_type == CODE_TYPE_QRCODE else "Barcode"
 
 
-def main(page: ft.Page):
-    """Main application entry point."""
-    # Load saved settings
-    saved_config = load_settings()
+def setup_page_config(page: ft.Page, saved_config: Optional[dict]) -> None:
+    """Configure page settings and properties.
 
-    # Initial setup
+    Args:
+        page: Flet page object.
+        saved_config: Previously saved configuration or None.
+    """
     page.vertical_alignment = ft.MainAxisAlignment.CENTER
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
     page.window.min_width = 600
@@ -298,18 +363,24 @@ def main(page: ft.Page):
     page.window.icon = os.path.abspath("barcode-scan.ico")
     page.title = "Barcode Printer"
 
-    # Navigation state
-    current_view = [0]  # Use list to allow modification in nested functions
-
     # Set theme from settings or default to DARK
     saved_theme = saved_config.get("theme_mode") if saved_config else "dark"
-    if saved_theme == "dark":
-        page.theme_mode = ft.ThemeMode.DARK
-    else:
-        page.theme_mode = ft.ThemeMode.LIGHT
+    page.theme_mode = ft.ThemeMode.DARK if saved_theme == "dark" else ft.ThemeMode.LIGHT
 
-    # UI Components
 
+def create_ui_components(
+    page: ft.Page, printers: list[str], saved_config: Optional[dict]
+) -> dict:
+    """Create all UI components.
+
+    Args:
+        page: Flet page object.
+        printers: List of available printers.
+        saved_config: Previously saved configuration or None.
+
+    Returns:
+        Dictionary of UI components.
+    """
     barcode_chooser = ft.SegmentedButton(
         selected=["1"],
         segments=[
@@ -333,9 +404,8 @@ def main(page: ft.Page):
         border_color=ft.Colors.PRIMARY,
     )
 
-    preview_image = ft.Image(src="", width=300, visible=False, border_radius=5)
+    preview_image = ft.Image(src="", width=200, visible=False, border_radius=5)
 
-    printers = get_printers()
     default_printer = printers[0] if printers else None
     if saved_config and saved_config.get("printer") in printers:
         default_printer = saved_config["printer"]
@@ -346,7 +416,59 @@ def main(page: ft.Page):
         value=default_printer,
         options=[ft.dropdown.Option(p) for p in printers],
         border_color=ft.Colors.PRIMARY,
+        disabled=len(printers) == 0,
     )
+
+    progress_bar = ft.ProgressBar(
+        width=None,  # Full width
+        visible=False,
+        color=ft.Colors.PRIMARY,
+        height=4,  # Thin bar like YouTube/Google style
+    )
+
+    return {
+        "barcode_chooser": barcode_chooser,
+        "barcode_text": barcode_text,
+        "preview_image": preview_image,
+        "printer_dropdown": printer_dropdown,
+        "progress_bar": progress_bar,
+    }
+
+
+def main(page: ft.Page) -> None:
+    """Main application entry point."""
+    # Load saved settings
+    saved_config = load_settings()
+
+    # Setup page configuration
+    setup_page_config(page, saved_config)
+
+    # Navigation state
+    current_view = [0]  # Use list to allow modification in nested functions
+
+    # Get printers and check if any are available
+    printers = get_printers()
+    if not printers:
+        # Show error dialog if no printers found
+        def close_dialog(e):
+            page.window.destroy()
+
+        error_dialog = ft.AlertDialog(
+            title=ft.Text("No Printers Found"),
+            content=ft.Text(
+                "No printers are installed on this system. Please install a printer and restart the application."
+            ),
+            actions=[ft.TextButton("Close", on_click=close_dialog)],
+        )
+        page.show_dialog(error_dialog)
+
+    # Create UI components
+    components = create_ui_components(page, printers, saved_config)
+    barcode_chooser = components["barcode_chooser"]
+    barcode_text = components["barcode_text"]
+    preview_image = components["preview_image"]
+    printer_dropdown = components["printer_dropdown"]
+    progress_bar = components["progress_bar"]
 
     # Event Handlers
     async def on_window_event(e):
@@ -389,50 +511,137 @@ def main(page: ft.Page):
         page.show_dialog(ft.SnackBar(ft.Text("Settings saved!")))
         page.update()
 
-    def show_preview(e):
+    async def show_preview(e):
         """Generate and display barcode/QR code preview."""
-        if not barcode_text.value:
+        if not barcode_text.value or not barcode_text.value.strip():
             preview_image.visible = False
             page.update()
-            return
-
-        code_type = get_selected_code_type()
-        pil_img = generate_label_image(barcode_text.value, code_type)
-        b64_string = pil_to_base64(pil_img)
-        preview_image.src = b64_string
-        preview_image.visible = True
-        page.update()
-
-    async def handle_print(e):
-        """Print the barcode/QR code and reset the form."""
-        if not barcode_text.value:
-            await barcode_text.focus()
             return
 
         code_type = get_selected_code_type()
 
         try:
-            print_image(
-                generate_label_image(barcode_text.value, code_type),
-                printer_dropdown.value,
-            )
-
-            # Save to history with code type
-            save_history_entry(barcode_text.value, printer_dropdown.value, code_type)
-
-            barcode_text.value = ""
+            # Generate image (synchronous but fast enough for preview)
+            pil_img = generate_label_image(barcode_text.value.strip(), code_type)
+            b64_string = pil_to_base64(pil_img)
+            preview_image.src = b64_string
+            preview_image.visible = True
+        except ValueError as e:
             preview_image.visible = False
-            await barcode_text.focus()
-
-            page.show_dialog(ft.SnackBar(ft.Text("Printing!")))
-            page.update()
-        except Exception as exc:
+            page.show_dialog(ft.SnackBar(ft.Text(str(e)), bgcolor=ft.Colors.ERROR))
+        except Exception as e:
+            preview_image.visible = False
             page.show_dialog(
                 ft.SnackBar(
-                    ft.Text(f"Print failed: {str(exc)}"), bgcolor=ft.Colors.ERROR
+                    ft.Text(f"Preview failed: {str(e)}"), bgcolor=ft.Colors.ERROR
                 )
             )
+
+        page.update()
+
+    async def handle_print(e):
+        """Print the barcode/QR code in a separate thread and reset the form."""
+        if not barcode_text.value or not barcode_text.value.strip():
+            await barcode_text.focus()
+            return
+
+        if not printer_dropdown.value:
+            page.show_dialog(
+                ft.SnackBar(ft.Text("Please select a printer"), bgcolor=ft.Colors.ERROR)
+            )
             page.update()
+            return
+
+        code_type = get_selected_code_type()
+        text_to_print = barcode_text.value.strip()
+        printer_name = printer_dropdown.value
+
+        # Show indeterminate progress bar
+        progress_bar.visible = True
+        progress_bar.value = None  # Indeterminate (animated)
+        page.update()
+
+        def print_in_thread():
+            """Print function to run in separate thread."""
+            try:
+                img = generate_label_image(text_to_print, code_type)
+                print_image(img, printer_name)
+
+                # Save to history
+                save_history_entry(text_to_print, printer_name, code_type)
+
+                # Update UI on success - use run_thread for safe UI updates
+                def show_success():
+                    page.show_dialog(ft.SnackBar(ft.Text("Print complete!")))
+                    page.update()
+
+                def hide_progress_success():
+                    progress_bar.visible = False
+                    page.update()
+
+                page.run_thread(show_success)
+                # Use Timer to hide progress bar after delay (non-blocking)
+                threading.Timer(
+                    0.5, lambda: page.run_thread(hide_progress_success)
+                ).start()
+
+            except ValueError as ve:
+                # Error - use run_thread for safe UI updates
+                def show_error_value():
+                    progress_bar.color = ft.Colors.ERROR
+                    page.update()
+                    page.show_dialog(
+                        ft.SnackBar(ft.Text(str(ve)), bgcolor=ft.Colors.ERROR)
+                    )
+                    page.update()
+
+                def hide_progress_error():
+                    progress_bar.visible = False
+                    progress_bar.color = ft.Colors.PRIMARY
+                    page.update()
+
+                page.run_thread(show_error_value)
+                # Use Timer to hide progress bar after delay (non-blocking)
+                threading.Timer(
+                    0.5, lambda: page.run_thread(hide_progress_error)
+                ).start()
+
+            except Exception as exc:
+                # Error - use run_thread for safe UI updates
+                def show_error_general():
+                    progress_bar.color = ft.Colors.ERROR
+                    page.update()
+                    page.show_dialog(
+                        ft.SnackBar(
+                            ft.Text(f"Print failed: {str(exc)}"),
+                            bgcolor=ft.Colors.ERROR,
+                        )
+                    )
+                    page.update()
+
+                def hide_progress_error_general():
+                    progress_bar.visible = False
+                    progress_bar.color = ft.Colors.PRIMARY
+                    page.update()
+
+                page.run_thread(show_error_general)
+                # Use Timer to hide progress bar after delay (non-blocking)
+                threading.Timer(
+                    0.5, lambda: page.run_thread(hide_progress_error_general)
+                ).start()
+                page.update()
+
+                page.run_thread(on_error_general)
+
+        # Run print in background thread
+        print_thread = threading.Thread(target=print_in_thread, daemon=True)
+        print_thread.start()
+
+        # Clear form
+        barcode_text.value = ""
+        preview_image.visible = False
+        await barcode_text.focus()
+        page.update()
 
     async def focus_on_background_click(e):
         """Focus text field when background is clicked."""
@@ -509,6 +718,9 @@ def main(page: ft.Page):
         # Clear current content
         page.clean()
 
+        # Always add progress bar at top (under appbar)
+        page.add(progress_bar)
+
         if current_view[0] == 0:
             # Print view
             page.floating_action_button = None
@@ -575,7 +787,7 @@ def main(page: ft.Page):
     )
 
     # Define and set the code type change handler
-    def on_code_type_change(e):
+    async def on_code_type_change(e):
         """Handle segmented button changes to auto-refresh preview and update button text."""
         code_type = get_selected_code_type()
 
@@ -584,7 +796,7 @@ def main(page: ft.Page):
 
         # Auto-refresh preview if visible
         if preview_image.visible and barcode_text.value:
-            show_preview(None)
+            await show_preview(None)
         else:
             page.update()
 
@@ -630,7 +842,8 @@ def main(page: ft.Page):
         expand=True,
     )
 
-    # Add initial view
+    # Add initial view with progress bar
+    page.add(progress_bar)
     page.add(print_view)
 
 
