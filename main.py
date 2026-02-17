@@ -195,14 +195,21 @@ def load_settings():
     return None
 
 
-def save_history_entry(barcode_text, printer_name):
-    """Save a print history entry."""
+def save_history_entry(barcode_text, printer_name, code_type="barcode"):
+    """Save a print history entry.
+
+    Args:
+        barcode_text: The text that was encoded.
+        printer_name: Name of the printer used.
+        code_type: Type of code printed - "barcode" or "qrcode".
+    """
     ensure_appdata_dir()
     history = load_history()
 
     entry = {
         "barcode": barcode_text,
         "printer": printer_name,
+        "code_type": code_type,
         "timestamp": datetime.now().isoformat(),
     }
 
@@ -361,8 +368,8 @@ def main(page: ft.Page):
             generate_label_image(barcode_text.value, code_type), printer_dropdown.value
         )
 
-        # Save to history
-        save_history_entry(barcode_text.value, printer_dropdown.value)
+        # Save to history with code type
+        save_history_entry(barcode_text.value, printer_dropdown.value, code_type)
 
         barcode_text.value = ""
         preview_image.visible = False
@@ -392,10 +399,20 @@ def main(page: ft.Page):
             timestamp = datetime.fromisoformat(entry["timestamp"])
             formatted_time = timestamp.strftime("%m/%d/%Y %I:%M %p")
 
+            # Get code type (default to "barcode" for old entries without this field)
+            code_type = entry.get("code_type", "barcode")
+
+            # Display text only
+            if code_type == "qrcode":
+                type_text = "QR Code"
+            else:
+                type_text = "Barcode"
+
             rows.append(
                 ftd.DataRow2(
                     selected=False,
                     cells=[
+                        ft.DataCell(ft.Text(type_text)),
                         ft.DataCell(ft.Text(entry["barcode"], selectable=True)),
                         ft.DataCell(ft.Text(entry["printer"], selectable=True)),
                         ft.DataCell(ft.Text(formatted_time, selectable=True)),
@@ -411,7 +428,8 @@ def main(page: ft.Page):
                     heading_row_color=ft.Colors.PRIMARY_CONTAINER,
                     min_width=500,
                     columns=[
-                        ftd.DataColumn2(ft.Text("Barcode"), size="l"),
+                        ftd.DataColumn2(ft.Text("Type"), size="s"),
+                        ftd.DataColumn2(ft.Text("Data"), size="l"),
                         ftd.DataColumn2(ft.Text("Printer"), size="m"),
                         ftd.DataColumn2(ft.Text("Date & Time"), size="m"),
                     ],
@@ -496,6 +514,33 @@ def main(page: ft.Page):
         on_change=on_navigation_change,
     )
 
+    # Create print button as variable so it can be updated
+    print_button = ft.FilledButton(
+        width=245,
+        height=50,
+        content=ft.Text("Print Barcode"),
+        icon=ft.Icons.PRINT_ROUNDED,
+        on_click=handle_print,
+    )
+
+    # Define and set the code type change handler
+    def on_code_type_change(e):
+        """Handle segmented button changes to auto-refresh preview and update button text."""
+        # Update print button text
+        if "2" in barcode_chooser.selected:
+            print_button.content = ft.Text("Print QR Code")
+        else:
+            print_button.content = ft.Text("Print Barcode")
+
+        # Auto-refresh preview if visible
+        if preview_image.visible and barcode_text.value:
+            show_preview(None)
+        else:
+            page.update()
+
+    # Set the on_change handler now that print_button exists
+    barcode_chooser.on_change = on_code_type_change
+
     # Create the print view
     print_view = ft.Stack(
         [
@@ -521,13 +566,7 @@ def main(page: ft.Page):
                                 icon=ft.Icons.REMOVE_RED_EYE_ROUNDED,
                                 on_click=show_preview,
                             ),
-                            ft.FilledButton(
-                                width=245,
-                                height=50,
-                                content=ft.Text("Print Barcode"),
-                                icon=ft.Icons.PRINT_ROUNDED,
-                                on_click=handle_print,
-                            ),
+                            print_button,
                         ],
                         alignment=ft.MainAxisAlignment.CENTER,
                         spacing=10,
