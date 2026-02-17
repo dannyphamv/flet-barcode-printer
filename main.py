@@ -22,6 +22,7 @@ from PIL import Image, ImageWin
 import win32con
 import win32print
 import win32ui
+import win32clipboard
 import ctypes
 
 ctypes.windll.shcore.SetProcessDpiAwareness(2)  # PROCESS_PER_MONITOR_DPI_AWARE
@@ -657,6 +658,38 @@ def main(page: ft.Page) -> None:
         """Focus text field when background is clicked."""
         await barcode_text.focus()
 
+    async def reprint_from_history(barcode: str, code_type: str):
+        """Copy history entry to clipboard and text field, then switch to Print tab."""
+        # Copy to system clipboard
+        # Copy to clipboard using win32 API
+        win32clipboard.OpenClipboard()
+        win32clipboard.EmptyClipboard()
+        win32clipboard.SetClipboardText(barcode, win32clipboard.CF_UNICODETEXT)
+        win32clipboard.CloseClipboard()
+
+        # Populate text field with the barcode data
+        barcode_text.value = barcode
+
+        # Select the correct code type
+        if code_type == CODE_TYPE_QRCODE:
+            barcode_chooser.selected = [QRCODE_SELECTOR_VALUE]
+        else:
+            barcode_chooser.selected = ["1"]
+
+        # Update print button text to match
+        print_button.content = ft.Text(f"Print {get_code_type_display(code_type)}")
+
+        # Switch to Print tab
+        current_view[0] = 0
+        page.navigation_bar.selected_index = 0
+        update_view()
+
+        # Focus the text field
+        await barcode_text.focus()
+
+        page.show_dialog(ft.SnackBar(ft.Text("Copied to clipboard & text field!")))
+        page.update()
+
     def build_history_table():
         history = load_history()
 
@@ -682,12 +715,20 @@ def main(page: ft.Page) -> None:
             code_type = entry.get("code_type", CODE_TYPE_BARCODE)
             type_text = get_code_type_display(code_type)
 
+            # Capture entry values for the click handler closure
+            entry_barcode = entry["barcode"]
+            entry_code_type = code_type
+
+            async def on_row_tap(e, b=entry_barcode, ct=entry_code_type):
+                await reprint_from_history(b, ct)
+
             rows.append(
                 ftd.DataRow2(
                     selected=False,
+                    on_tap=on_row_tap,
                     cells=[
                         ft.DataCell(ft.Text(type_text)),
-                        ft.DataCell(ft.Text(entry["barcode"], selectable=True)),
+                        ft.DataCell(ft.Text(entry["barcode"])),
                         ft.DataCell(ft.Text(entry["printer"])),
                         ft.DataCell(ft.Text(formatted_time)),
                     ],
