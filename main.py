@@ -360,7 +360,7 @@ def setup_page_config(page: ft.Page, saved_config: Optional[dict]) -> None:
     page.window.min_height = 700
     page.window.width = 700
     page.window.height = 700
-    page.window.icon = os.path.abspath("barcode-scan.ico")
+    page.window.icon = os.path.abspath("favicon.ico")
     page.title = "Barcode Printer"
 
     # Set theme from settings or default to DARK
