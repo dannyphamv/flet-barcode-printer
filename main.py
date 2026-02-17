@@ -10,8 +10,6 @@ from datetime import datetime
 import flet as ft
 import flet_datatable2 as ftd
 
-import io
-import logging
 from collections import OrderedDict
 
 import barcode as python_barcode
@@ -21,6 +19,17 @@ from PIL import Image, ImageWin
 import win32con
 import win32print
 import win32ui
+
+
+# Configuration Constants
+CODE_TYPE_BARCODE = "barcode"
+CODE_TYPE_QRCODE = "qrcode"
+QRCODE_SELECTOR_VALUE = "2"
+PRINT_WIDTH_INCHES = 4
+QR_BOX_SIZE = 20  # For 4-inch printing at 300 DPI
+QR_BORDER = 4
+BARCODE_CACHE_MAX_SIZE = 100
+HISTORY_MAX_ENTRIES = 100
 
 
 # Printer List Cache
@@ -47,19 +56,20 @@ def get_printers(force_refresh=False) -> list[str]:
     return _PRINTER_LIST_CACHE
 
 
-# Barcode Image Cache (LRU cache limited to 100 items)
+# Barcode Image Cache (LRU cache)
 BARCODE_IMAGE_CACHE = OrderedDict()
-BARCODE_IMAGE_CACHE_MAXSIZE = 100
 
 
-def generate_label_image(barcode_text: str, code_type: str = "barcode") -> Image.Image:
+def generate_label_image(
+    barcode_text: str, code_type: str = CODE_TYPE_BARCODE
+) -> Image.Image:
     """Generate a label image with a barcode or QR code for the given text.
 
     Uses LRU cache for performance optimization.
 
     Args:
         barcode_text: The text to encode in the barcode/QR code.
-        code_type: Type of code to generate - "barcode" or "qrcode".
+        code_type: Type of code to generate - CODE_TYPE_BARCODE or CODE_TYPE_QRCODE.
 
     Returns:
         PIL Image object containing the barcode/QR code label.
@@ -71,13 +81,13 @@ def generate_label_image(barcode_text: str, code_type: str = "barcode") -> Image
         BARCODE_IMAGE_CACHE.move_to_end(cache_key)
         return BARCODE_IMAGE_CACHE[cache_key].copy()
 
-    if code_type == "qrcode":
-        # Generate QR code
+    if code_type == CODE_TYPE_QRCODE:
+        # Generate QR code with larger box_size for 4-inch printing
         qr = qrcode.QRCode(
             version=1,
             error_correction=qrcode.constants.ERROR_CORRECT_L,
-            box_size=10,
-            border=4,
+            box_size=QR_BOX_SIZE,
+            border=QR_BORDER,
         )
         qr.add_data(barcode_text)
         qr.make(fit=True)
@@ -85,28 +95,21 @@ def generate_label_image(barcode_text: str, code_type: str = "barcode") -> Image
         # Convert to PIL Image if needed
         if not isinstance(code_img, Image.Image):
             code_img = code_img.convert("RGB")
+
+        label_img = code_img
     else:
         # Generate barcode using python-barcode
+        # Returns directly without label wrapper for full 4-inch width printing
         code128 = python_barcode.get("code128", barcode_text, writer=ImageWriter())
-        with io.BytesIO() as buffer:
+        with BytesIO() as buffer:
             code128.write(buffer)
             buffer.seek(0)
-            code_img = Image.open(buffer).copy()
-
-    # Create a white label and center the code on it
-    label_width, label_height = 600, 300
-    label_img = Image.new("RGB", (label_width, label_height), 0xFFFFFF)
-
-    # Get the size of the code image
-    code_width, code_height = code_img.size
-    code_x = (label_width - code_width) // 2
-    code_y = (label_height - code_height) // 2
-    label_img.paste(code_img, (code_x, code_y))
+            label_img = Image.open(buffer).copy()
 
     # Add to cache and enforce max size
     BARCODE_IMAGE_CACHE[cache_key] = label_img.copy()
     BARCODE_IMAGE_CACHE.move_to_end(cache_key)
-    if len(BARCODE_IMAGE_CACHE) > BARCODE_IMAGE_CACHE_MAXSIZE:
+    if len(BARCODE_IMAGE_CACHE) > BARCODE_CACHE_MAX_SIZE:
         BARCODE_IMAGE_CACHE.popitem(last=False)
 
     return label_img
@@ -125,7 +128,6 @@ def print_image(img: Image.Image, printer_name: str) -> None:
     """
     pdc = win32ui.CreateDC()
     if pdc is None:
-        logging.error("Failed to create printer device context.")
         raise RuntimeError("Failed to create printer device context.")
 
     pdc.CreatePrinterDC(printer_name)
@@ -133,25 +135,26 @@ def print_image(img: Image.Image, printer_name: str) -> None:
         pdc.StartDoc("Barcode Print")
         pdc.StartPage()
 
-        # Get printable area size
+        # Get printable area size and printer DPI
         printable_width = pdc.GetDeviceCaps(win32con.HORZRES)
         printable_height = pdc.GetDeviceCaps(win32con.VERTRES)
+        printer_dpi = pdc.GetDeviceCaps(win32con.LOGPIXELSX)
 
-        # Resize image to fit printable width (maintain aspect ratio)
-        if img.width != printable_width:
-            scale = printable_width / img.width
-            scaled_width = printable_width
-            scaled_height = int(img.height * scale)
-            img = img.resize((scaled_width, scaled_height))
+        # Scale to configured width OR page width, whichever is smaller
+        max_width = int(PRINT_WIDTH_INCHES * printer_dpi)
+        target_width = min(max_width, printable_width)
+
+        aspect_ratio = img.height / img.width
+        target_height = int(target_width * aspect_ratio)
+
+        # Resize image with high-quality resampling
+        img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
 
         # Center the image on the page
-        x1 = 0
-        if printable_height > img.height:
-            y1 = (printable_height - img.height) // 2
-        else:
-            y1 = 0
-        x2 = x1 + img.width
-        y2 = y1 + img.height
+        x1 = (printable_width - target_width) // 2
+        y1 = (printable_height - target_height) // 2
+        x2 = x1 + target_width
+        y2 = y1 + target_height
 
         dib = ImageWin.Dib(img)
         dib.draw(pdc.GetHandleOutput(), (x1, y1, x2, y2))
@@ -159,7 +162,6 @@ def print_image(img: Image.Image, printer_name: str) -> None:
         pdc.EndPage()
         pdc.EndDoc()
     except Exception as exc:
-        logging.error("Print error: %s", exc)
         raise
     finally:
         pdc.DeleteDC()
@@ -176,34 +178,56 @@ def ensure_appdata_dir():
     APPDATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def load_json_file(filepath: Path, default=None):
+    """Load data from a JSON file.
+
+    Args:
+        filepath: Path to the JSON file.
+        default: Default value to return if file doesn't exist or has errors.
+
+    Returns:
+        Loaded data or default value.
+    """
+    if filepath.exists():
+        try:
+            with open(filepath, "r") as f:
+                return json.load(f)
+        except Exception:
+            return default
+    return default
+
+
+def save_json_file(filepath: Path, data):
+    """Save data to a JSON file.
+
+    Args:
+        filepath: Path to the JSON file.
+        data: Data to save (must be JSON serializable).
+    """
+    ensure_appdata_dir()
+    with open(filepath, "w") as f:
+        json.dump(data, f, indent=2)
+
+
 def save_settings(printer, theme_mode):
     """Save printer and theme mode settings to JSON file."""
-    ensure_appdata_dir()
     settings = {"printer": printer, "theme_mode": theme_mode.value}
-    with open(SETTINGS_FILE, "w") as f:
-        json.dump(settings, f)
+    save_json_file(SETTINGS_FILE, settings)
 
 
 def load_settings():
     """Load settings from JSON file if it exists."""
-    if SETTINGS_FILE.exists():
-        try:
-            with open(SETTINGS_FILE, "r") as f:
-                return json.load(f)
-        except Exception:
-            return None
-    return None
+    return load_json_file(SETTINGS_FILE)
 
 
-def save_history_entry(barcode_text, printer_name, code_type="barcode"):
+def save_history_entry(barcode_text, printer_name, code_type=CODE_TYPE_BARCODE):
     """Save a print history entry.
 
     Args:
         barcode_text: The text that was encoded.
         printer_name: Name of the printer used.
-        code_type: Type of code printed - "barcode" or "qrcode".
+        code_type: Type of code printed - CODE_TYPE_BARCODE or CODE_TYPE_QRCODE.
     """
-    ensure_appdata_dir()
     history = load_history()
 
     entry = {
@@ -215,29 +239,48 @@ def save_history_entry(barcode_text, printer_name, code_type="barcode"):
 
     history.insert(0, entry)  # Add to beginning
 
-    # Keep only last 100 entries
-    history = history[:100]
+    # Keep only last N entries
+    history = history[:HISTORY_MAX_ENTRIES]
 
-    with open(HISTORY_FILE, "w") as f:
-        json.dump(history, f, indent=2)
+    save_json_file(HISTORY_FILE, history)
 
 
 def load_history():
     """Load print history from JSON file."""
-    if HISTORY_FILE.exists():
-        try:
-            with open(HISTORY_FILE, "r") as f:
-                return json.load(f)
-        except Exception:
-            return []
-    return []
+    return load_json_file(HISTORY_FILE, default=[])
 
 
 def clear_history():
     """Clear all print history entries."""
-    ensure_appdata_dir()
-    with open(HISTORY_FILE, "w") as f:
-        json.dump([], f)
+    save_json_file(HISTORY_FILE, [])
+
+
+def pil_to_base64(img: Image.Image) -> str:
+    """Convert a PIL Image to a base64 encoded string for display in Flet.
+
+    Args:
+        img: PIL Image object to convert.
+
+    Returns:
+        Base64 encoded string suitable for use as image src in Flet.
+    """
+    buffer = BytesIO()
+    img.save(buffer, format="PNG")
+    buffer.seek(0)
+    img_base64 = base64.b64encode(buffer.read()).decode()
+    return f"data:image/png;base64,{img_base64}"
+
+
+def get_code_type_display(code_type: str) -> str:
+    """Convert code type to display text.
+
+    Args:
+        code_type: CODE_TYPE_BARCODE or CODE_TYPE_QRCODE.
+
+    Returns:
+        Display text for the code type.
+    """
+    return "QR Code" if code_type == CODE_TYPE_QRCODE else "Barcode"
 
 
 def main(page: ft.Page):
@@ -314,12 +357,17 @@ def main(page: ft.Page):
 
     page.on_window_event = on_window_event
 
-    def pil_to_base64(pil_img):
-        """Convert PIL Image to base64 encoded string."""
-        buffered = BytesIO()
-        pil_img.save(buffered, format="PNG")
-        img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
-        return f"data:image/png;base64,{img_str}"
+    def get_selected_code_type() -> str:
+        """Get the currently selected code type from the segmented button.
+
+        Returns:
+            CODE_TYPE_BARCODE or CODE_TYPE_QRCODE.
+        """
+        return (
+            CODE_TYPE_QRCODE
+            if QRCODE_SELECTOR_VALUE in barcode_chooser.selected
+            else CODE_TYPE_BARCODE
+        )
 
     def toggle_theme(e):
         """Toggle between dark and light theme modes."""
@@ -348,8 +396,7 @@ def main(page: ft.Page):
             page.update()
             return
 
-        # Get selected code type from segmented button
-        code_type = "qrcode" if "2" in barcode_chooser.selected else "barcode"
+        code_type = get_selected_code_type()
         pil_img = generate_label_image(barcode_text.value, code_type)
         b64_string = pil_to_base64(pil_img)
         preview_image.src = b64_string
@@ -362,20 +409,30 @@ def main(page: ft.Page):
             await barcode_text.focus()
             return
 
-        # Get selected code type from segmented button
-        code_type = "qrcode" if "2" in barcode_chooser.selected else "barcode"
-        print_image(
-            generate_label_image(barcode_text.value, code_type), printer_dropdown.value
-        )
+        code_type = get_selected_code_type()
 
-        # Save to history with code type
-        save_history_entry(barcode_text.value, printer_dropdown.value, code_type)
+        try:
+            print_image(
+                generate_label_image(barcode_text.value, code_type),
+                printer_dropdown.value,
+            )
 
-        barcode_text.value = ""
-        preview_image.visible = False
-        await barcode_text.focus()
-        page.show_dialog(ft.SnackBar(ft.Text("Printing!")))
-        page.update()
+            # Save to history with code type
+            save_history_entry(barcode_text.value, printer_dropdown.value, code_type)
+
+            barcode_text.value = ""
+            preview_image.visible = False
+            await barcode_text.focus()
+
+            page.show_dialog(ft.SnackBar(ft.Text("Printing!")))
+            page.update()
+        except Exception as exc:
+            page.show_dialog(
+                ft.SnackBar(
+                    ft.Text(f"Print failed: {str(exc)}"), bgcolor=ft.Colors.ERROR
+                )
+            )
+            page.update()
 
     async def focus_on_background_click(e):
         """Focus text field when background is clicked."""
@@ -399,14 +456,9 @@ def main(page: ft.Page):
             timestamp = datetime.fromisoformat(entry["timestamp"])
             formatted_time = timestamp.strftime("%m/%d/%Y %I:%M %p")
 
-            # Get code type (default to "barcode" for old entries without this field)
-            code_type = entry.get("code_type", "barcode")
-
-            # Display text only
-            if code_type == "qrcode":
-                type_text = "QR Code"
-            else:
-                type_text = "Barcode"
+            # Get code type (default to barcode for old entries without this field)
+            code_type = entry.get("code_type", CODE_TYPE_BARCODE)
+            type_text = get_code_type_display(code_type)
 
             rows.append(
                 ftd.DataRow2(
@@ -444,8 +496,7 @@ def main(page: ft.Page):
         """Clear all print history."""
         clear_history()
         update_view()
-        page.snack_bar = ft.SnackBar(ft.Text("History cleared!"))
-        page.snack_bar.open = True
+        page.show_dialog(ft.SnackBar(ft.Text("History cleared!")))
         page.update()
 
     def on_navigation_change(e):
@@ -526,11 +577,10 @@ def main(page: ft.Page):
     # Define and set the code type change handler
     def on_code_type_change(e):
         """Handle segmented button changes to auto-refresh preview and update button text."""
+        code_type = get_selected_code_type()
+
         # Update print button text
-        if "2" in barcode_chooser.selected:
-            print_button.content = ft.Text("Print QR Code")
-        else:
-            print_button.content = ft.Text("Print Barcode")
+        print_button.content = ft.Text(f"Print {get_code_type_display(code_type)}")
 
         # Auto-refresh preview if visible
         if preview_image.visible and barcode_text.value:
