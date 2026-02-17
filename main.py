@@ -655,7 +655,7 @@ def main(page: ft.Page) -> None:
                 content=ft.Text(
                     "History Empty\n\nMade with ❤️ by Danny Pham",
                     size=20,
-                    color=ft.Colors.GREY_500,
+                    color=ft.Colors.GREY,
                     text_align=ft.TextAlign.CENTER,
                 ),
                 alignment=ft.alignment.Alignment(0, 0),
