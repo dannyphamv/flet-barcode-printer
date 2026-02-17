@@ -5,7 +5,6 @@ import os
 import base64
 import threading
 import tempfile
-import time
 from io import BytesIO
 from pathlib import Path
 from datetime import datetime
@@ -32,7 +31,6 @@ class PrintConfig:
     width_inches: int = 4
     qr_box_size: int = 20
     qr_border: int = 4
-    cache_max_size: int = 100
     history_max_entries: int = 100
 
 
@@ -404,8 +402,6 @@ def create_ui_components(
         border_color=ft.Colors.PRIMARY,
     )
 
-    preview_image = ft.Image(src="", width=200, visible=False, border_radius=5)
-
     default_printer = printers[0] if printers else None
     if saved_config and saved_config.get("printer") in printers:
         default_printer = saved_config["printer"]
@@ -429,7 +425,6 @@ def create_ui_components(
     return {
         "barcode_chooser": barcode_chooser,
         "barcode_text": barcode_text,
-        "preview_image": preview_image,
         "printer_dropdown": printer_dropdown,
         "progress_bar": progress_bar,
     }
@@ -466,7 +461,6 @@ def main(page: ft.Page) -> None:
     components = create_ui_components(page, printers, saved_config)
     barcode_chooser = components["barcode_chooser"]
     barcode_text = components["barcode_text"]
-    preview_image = components["preview_image"]
     printer_dropdown = components["printer_dropdown"]
     progress_bar = components["progress_bar"]
 
@@ -512,25 +506,41 @@ def main(page: ft.Page) -> None:
         page.update()
 
     async def show_preview(e):
-        """Generate and display barcode/QR code preview."""
+        """Generate and display barcode/QR code preview in a modal dialog."""
         if not barcode_text.value or not barcode_text.value.strip():
-            preview_image.visible = False
-            page.update()
             return
 
         code_type = get_selected_code_type()
 
         try:
-            # Generate image (synchronous but fast enough for preview)
             pil_img = generate_label_image(barcode_text.value.strip(), code_type)
             b64_string = pil_to_base64(pil_img)
-            preview_image.src = b64_string
-            preview_image.visible = True
+
+            # Keep height constant at 200px, scale width proportionally
+            display_h = 200
+            img_w, img_h = pil_img.size
+            display_w = int(img_w * (display_h / img_h))
+
+            dialog_image = ft.Image(
+                src=b64_string,
+                width=display_w,
+                height=display_h,
+                border_radius=4,
+            )
+
+            def close_preview(e):
+                preview_dialog.open = False
+                page.update()
+
+            preview_dialog = ft.AlertDialog(
+                content=dialog_image,
+                actions=[ft.TextButton("Close", on_click=close_preview)],
+                actions_alignment=ft.MainAxisAlignment.END,
+            )
+            page.show_dialog(preview_dialog)
         except ValueError as e:
-            preview_image.visible = False
             page.show_dialog(ft.SnackBar(ft.Text(str(e)), bgcolor=ft.Colors.ERROR))
         except Exception as e:
-            preview_image.visible = False
             page.show_dialog(
                 ft.SnackBar(
                     ft.Text(f"Preview failed: {str(e)}"), bgcolor=ft.Colors.ERROR
@@ -631,15 +641,12 @@ def main(page: ft.Page) -> None:
                 ).start()
                 page.update()
 
-                page.run_thread(on_error_general)
-
         # Run print in background thread
         print_thread = threading.Thread(target=print_in_thread, daemon=True)
         print_thread.start()
 
         # Clear form
         barcode_text.value = ""
-        preview_image.visible = False
         await barcode_text.focus()
         page.update()
 
@@ -797,11 +804,7 @@ def main(page: ft.Page) -> None:
         # Update print button text
         print_button.content = ft.Text(f"Print {get_code_type_display(code_type)}")
 
-        # Auto-refresh preview if visible
-        if preview_image.visible and barcode_text.value:
-            await show_preview(None)
-        else:
-            page.update()
+        page.update()
 
     # Set the on_change handler now that print_button exists
     barcode_chooser.on_change = on_code_type_change
@@ -836,7 +839,6 @@ def main(page: ft.Page) -> None:
                         alignment=ft.MainAxisAlignment.CENTER,
                         spacing=10,
                     ),
-                    preview_image,
                 ],
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 alignment=ft.MainAxisAlignment.CENTER,
