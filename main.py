@@ -733,7 +733,7 @@ def main(page: ft.Page) -> None:
             history = load_history()
             if history:
                 page.floating_action_button = ft.FloatingActionButton(
-                    icon=ft.Icons.DELETE_SWEEP_ROUNDED,
+                    icon=ft.CupertinoIcons.DELETE_SOLID,
                     tooltip="Clear History",
                     on_click=handle_clear_history,
                 )
@@ -785,7 +785,7 @@ def main(page: ft.Page) -> None:
         width=245,
         height=50,
         content=ft.Text("Print Barcode"),
-        icon=ft.Icons.PRINT_ROUNDED,
+        icon=ft.CupertinoIcons.PRINTER_FILL,
         on_click=handle_print,
     )
 
@@ -828,7 +828,7 @@ def main(page: ft.Page) -> None:
                                 width=245,
                                 height=50,
                                 content=ft.Text("Preview"),
-                                icon=ft.Icons.REMOVE_RED_EYE_ROUNDED,
+                                icon=ft.CupertinoIcons.EYE_FILL,
                                 on_click=show_preview,
                             ),
                             print_button,
