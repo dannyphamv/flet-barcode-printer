@@ -22,7 +22,6 @@ A modern, production-ready desktop application for generating and printing Code1
 - 🔒 **Thread-Safe** - Proper locking for concurrent operations
 - 💪 **Robust Error Handling** - Graceful handling of printer failures and invalid input
 - 🎚️ **Progress Indicator** - Visual progress bar for print operations
-- ⌨️ **Keyboard Shortcuts** - Ctrl+P (Print), Ctrl+S (Save), Ctrl+R (Preview), Esc (Clear)
 - 📐 **DPI Aware Printing** - Adapts to any printer resolution (300, 600, 1200+ DPI)
 
 ## 📸 Screenshots
