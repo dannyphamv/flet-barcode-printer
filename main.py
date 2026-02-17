@@ -653,7 +653,10 @@ def main(page: ft.Page) -> None:
         if not history:
             return ft.Container(
                 content=ft.Text(
-                    "No print history yet", size=20, color=ft.Colors.GREY_500
+                    "History Empty\n\nMade with ❤️ by Danny Pham",
+                    size=20,
+                    color=ft.Colors.GREY_500,
+                    text_align=ft.TextAlign.CENTER,
                 ),
                 alignment=ft.alignment.Alignment(0, 0),
                 expand=True,
