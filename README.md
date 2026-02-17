@@ -1,6 +1,6 @@
 # 🖨️ Barcode Printer
 
-A modern, user-friendly desktop application for generating and printing Code128 barcodes on Windows. Built with Python and Flet for a beautiful native experience.
+A modern, user-friendly desktop application for generating and printing Code128 barcodes and QR codes on Windows. Built with Python and Flet for a beautiful native experience.
 
 ![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg) ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg) ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
@@ -63,7 +63,9 @@ flet-barcode-printer/
 | Package                | Version  | Purpose              |
 | ---------------------- | -------- | -------------------- |
 | flet                   | >=0.24.0 | GUI framework        |
+| flet-datatable2        | >=0.80.5 | Enhanced data table for Flet |
 | python-barcode[images] | >=0.15.1 | Barcode generation   |
+| qrcode                 | >=0.4.6  | QR code generation   |
 | Pillow                 | >=10.0.0 | Image processing     |
 | pywin32                | >=306    | Windows printer APIs |
 
@@ -76,9 +78,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Acknowledgments
 
 - [Flet](https://flet.dev/) - Beautiful Python GUI framework
-- [python-barcode](https://github.com/WhyNotHugo/python-barcode) - Barcode generation
-- [Pillow](https://python-pillow.org/) - Image processing
-- [pywin32](https://github.com/mhammond/pywin32) - Windows API access
-- [Vectorslab - Flaticon](https://www.flaticon.com/free-icons/barcode) - Free icons
-
-**Made with ❤️ using Python and Flet**
+- [Fluent Emoji](https://github.com/microsoft/fluentui-emoji) - Fluent Emoji from Microsoft
