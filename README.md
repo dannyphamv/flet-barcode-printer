@@ -1,4 +1,4 @@
-# 🖨️ Barcode Printer
+# 🖨️ Barcode & QR Code Printer
 
 A modern, user-friendly desktop application for generating and printing Code128 barcodes and QR codes on Windows. Built with Python and Flet for a beautiful native experience.
 
