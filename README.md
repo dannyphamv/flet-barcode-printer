@@ -9,7 +9,7 @@ A modern, production-ready desktop application for generating and printing Code1
 - 📱 **Dual Code Support** - Generate both Code128 barcodes and QR codes
 - ⌨️ **Barcode Scanner Support** - Scan barcodes directly with USB/Bluetooth scanners
 - 🖨️ **Multi-Printer Support** - Select from any installed Windows printer
-- 👁️ **Live Preview** - See your barcode/QR code before printing with async generation
+- 👁️ **Preview** - See your barcode/QR code before printing with async generation
 - 📊 **Print History** - Track all printed codes with timestamps and type indicators
 - 🔁 **One-Click Reprint** - Tap any history entry to copy it to the clipboard and text field, ready to reprint instantly
 - 🗑️ **Clear History** - Contextual floating action button appears when history has entries to clear it in one tap
@@ -21,13 +21,14 @@ A modern, production-ready desktop application for generating and printing Code1
 - ⚡ **Performance Optimized** - LRU cache with thread-safe access for instant code generation
 - 🎯 **Auto-Focus** - Automatically re-focuses the input field on window focus and background click, always ready for the next scan
 - 🧵 **Threaded Printing** - Non-blocking print operations keep UI responsive
-- 📏 **Smart Scaling** - Auto-scales to 4 inches or page width, handles both dimensions
+- 📐 **Smart Scaling** - Auto-scales to 4 inches or page width, handles both dimensions
 - 🔒 **Thread-Safe** - Proper locking for concurrent operations
 - 💪 **Robust Error Handling** - Graceful handling of printer failures and invalid input with backward-compatible history entries
 - 🎚️ **Progress Indicator** - Visual indeterminate progress bar during print with delayed auto-hide via `threading.Timer`
 - 📐 **DPI Aware Printing** - Adapts to any printer resolution (300, 600, 1200+ DPI)
 - 🖥️ **Per-Monitor DPI Aware** - Display renders sharply on high-DPI and multi-monitor setups via `SetProcessDpiAwareness`
 - 🪟 **Minimum Window Size** - Enforces a 700×700px minimum to prevent layout breakage
+- 🚫 **Zero pywin32 Dependency** - All printer access, clipboard, and GDI printing handled natively via `ctypes`
 
 ## 📸 Screenshots
 
@@ -35,34 +36,33 @@ A modern, production-ready desktop application for generating and printing Code1
 
 ## 🚀 Quick Start
 
-### Prerequisites
+### Download the Installer
 
-- **Python 3.9 or higher** (required for modern features)
-- **Windows OS** (for printer integration via pywin32)
+The easiest way to get started is to download the pre-built installer directly from the [Releases](https://github.com/dannyphamv/flet-barcode-printer/releases) page. Run `BarcodePrinter_Setup.exe` and follow the prompts — no Python required.
 
-### Installation
+### Build from Source
 
-1. **Clone or download this repository**
+**Prerequisites:** Python 3.10+
+
+1. **Clone the repository and install dependencies:**
 
    ```bash
    git clone https://github.com/dannyphamv/flet-barcode-printer.git
    cd flet-barcode-printer
-   ```
-
-2. **Install dependencies**
-
-   ```bash
    pip install -r requirements.txt
    ```
 
-3. **Run the application**
+2. **Build the standalone Windows executable:**
+
    ```bash
-   python main.py
+   flet build windows
    ```
-   **Or launch from .bat file**
-   ```bash
-   run.bat
-   ```
+
+3. **Create the installer with Inno Setup:**
+
+   [Download and install Inno Setup](https://jrsoftware.org/isdl.php), then double-click `installer.iss` to open it in Inno Setup Compiler and click the **Compile** button.
+
+   Your installer will be output to `installer_output\BarcodePrinter_Setup.exe`.
 
 ## 💡 Usage
 
@@ -80,28 +80,18 @@ The app automatically:
 - Maintains aspect ratio
 - Saves to print history
 
-## 📁 Project Structure
-
-```
-flet-barcode-printer/
-├── main.py               # Main application (900+ lines, production-ready)
-├── requirements.txt      # Python dependencies
-├── run.bat               # Windows launcher
-├── favicon.ico           # Application icon
-├── README.md             # This file
-└── LICENSE               # MIT License
-```
 
 ## 🔧 Dependencies
 
-| Package                | Version  | Purpose              |
-| ---------------------- | -------- | -------------------- |
-| flet                   | >=0.80.5 | Modern GUI framework        |
-| flet-datatable2        | >=0.80.5 | Enhanced data tables |
-| python-barcode[images] | >=0.16.1 | Code128 barcode generation   |
-| qrcode[pil]            | >=8.2    | QR code generation   |
-| Pillow                 | >=12.1.1 | Image processing & LANCZOS resampling    |
-| pywin32                | >=311    | Windows printer APIs |
+| Package                | Version  | Purpose                          |
+| ---------------------- | -------- | -------------------------------- |
+| flet                   | >=0.80.5 | Modern GUI framework             |
+| flet-datatable2        | >=0.80.5 | Enhanced data tables             |
+| python-barcode[images] | >=0.16.1 | Code128 barcode generation       |
+| qrcode[pil]            | >=8.2    | QR code generation               |
+| Pillow                 | >=12.1.1 | Image processing & LANCZOS resampling |
+
+> `pywin32` is **not required**. Printer enumeration, GDI printing, and clipboard access are all handled through Python's built-in `ctypes` module.
 
 See [requirements.txt](requirements.txt) for exact versions.
 
@@ -120,7 +110,7 @@ See [requirements.txt](requirements.txt) for exact versions.
 - **Backward-Compatible History**: Old entries without a `code_type` field default to barcode automatically
 
 ### Print Quality
-- **DPI Detection**: Queries printer capabilities via `GetDeviceCaps()`
+- **DPI Detection**: Queries printer capabilities via `GetDeviceCaps()` through `ctypes`
 - **Dynamic Scaling**: Calculates exact pixel dimensions based on printer DPI
 - **High-Quality Resampling**: Uses Pillow's LANCZOS algorithm
 - **Overflow Protection**: Checks both width and height constraints
@@ -128,10 +118,3 @@ See [requirements.txt](requirements.txt) for exact versions.
 ## 📝 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- [Flet](https://flet.dev/) - Beautiful Python GUI framework
-- [Fluent Emoji](https://github.com/microsoft/fluentui-emoji) - Fluent Emoji from Microsoft
-- [python-barcode](https://github.com/WhyNotHugo/python-barcode) - Barcode generation library
-- [qrcode](https://github.com/lincolnloop/python-qrcode) - QR code generation library

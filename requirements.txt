@@ -1,5 +1,5 @@
 # Barcode Printer Application Requirements
-# Python 3.9+ required (for modern typing features and threading improvements)
+# Python 3.10+ required
 
 # GUI Framework
 flet>=0.80.5
@@ -12,5 +12,5 @@ qrcode[pil]>=8.2
 # Image Processing
 Pillow>=12.1.1
 
-# Windows Printer Integration (Windows only)
-pywin32>=311
+# Note: pywin32 is NOT required.
+# Printer access, clipboard, and GDI printing are handled via ctypes (built-in).

@@ -1,0 +1,33 @@
+[project]
+name = "BarcodePrinter"
+version = "0.1.0"
+description = "A modern, production-ready desktop application for generating and printing Code128 barcodes and QR codes on Windows."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "Danny Pham", email = "dannyphamv@duck.com" }
+]
+dependencies = [
+    "flet>=0.80.5",
+    "flet-datatable2>=0.80.5",
+    "python-barcode[images]>=0.16.1",
+    "qrcode[pil]>=8.2",
+    "Pillow>=12.1.1",
+]
+
+[dependency-groups]
+dev = [
+    "flet-cli>=0.80.5",
+    "flet-desktop>=0.80.5",
+    "flet-web>=0.80.5",
+]
+
+[tool.flet]
+org = "com.dannyphamv"
+product = "BarcodePrinter"
+company = "Danny Pham"
+copyright = "Copyright (C) 2026 by Danny Pham. All rights reserved."
+additional_hooks_dirs = ["."]
+
+[tool.flet.app]
+path = "src"
