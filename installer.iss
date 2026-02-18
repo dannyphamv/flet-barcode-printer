@@ -12,6 +12,7 @@ PrivilegesRequiredOverridesAllowed=dialog
 CloseApplications=yes
 CloseApplicationsFilter=BarcodePrinter.exe
 RestartApplications=yes
+LicenseFile=LICENSE.txt
 
 ; Install paths
 DefaultDirName={autopf}\Barcode Printer
