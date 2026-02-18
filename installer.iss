@@ -9,6 +9,9 @@ AppUpdatesURL=https://dannyphamv.github.io/flet-barcode-printer/
 AppCopyright=Copyright (C) 2026 Danny Pham
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
+CloseApplications=yes
+CloseApplicationsFilter=BarcodePrinter.exe
+RestartApplications=yes
 
 ; Install paths
 DefaultDirName={autopf}\Barcode Printer
