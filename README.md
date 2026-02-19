@@ -85,7 +85,7 @@ The app automatically:
 
 | Package                | Version  | Purpose                          |
 | ---------------------- | -------- | -------------------------------- |
-| flet                   | >=0.80.5 | Modern GUI framework             |
+| flet[all]              | >=0.80.5 | Modern GUI framework             |
 | flet-datatable2        | >=0.80.5 | Enhanced data tables             |
 | python-barcode[images] | >=0.16.1 | Code128 barcode generation       |
 | qrcode[pil]            | >=8.2    | QR code generation               |
