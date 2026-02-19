@@ -2,7 +2,7 @@
 # Python 3.10+ required
 
 # GUI Framework
-flet>=0.80.5
+flet[all]>=0.80.5
 flet-datatable2>=0.80.5
 
 # Barcode Generation
