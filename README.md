@@ -32,7 +32,7 @@ A modern, production-ready desktop application for generating and printing Code1
 
 ## 📸 Screenshots
 
-![Screenshot of Barcode Printer](screenshot.avif)
+![Screenshot of Barcode Printer](src/assets/screenshot.avif)
 
 ## 🚀 Quick Start
 

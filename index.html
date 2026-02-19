@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css" />
 
   <link rel="stylesheet" type="text/css" href="https://dannyphamv.com/custom.css" />
-  <link rel="icon" href="favicon.ico" type="image/x-icon" />
+  <link rel="icon" href="src/assets/icon.ico" type="image/x-icon" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.clouds.min.js"></script>
   <script defer src="https://dannyphamv.com/script.js"></script>
@@ -37,7 +37,7 @@
       Python and Flet for a beautiful native experience.
     </p>
 
-    <img id="app-screenshot" src="screenshot-dark.avif" alt="Screenshot of Barcode Printer application"
+    <img id="app-screenshot" src="src/assets/screenshot-dark.avif" alt="Screenshot of Barcode Printer application"
       fetchpriority="high" oncontextmenu="return false;" />
 
     <div style="text-align: center">
@@ -75,7 +75,7 @@
 
     // Set initial screenshot
     if (screenshot) {
-      screenshot.src = isDark ? 'screenshot-dark.avif' : 'screenshot-light.avif';
+      screenshot.src = isDark ? 'src/assets/screenshot-dark.avif' : 'src/assets/screenshot-light.avif';
     }
 
     // Toggle on button click
@@ -83,7 +83,7 @@
       themeToggle.addEventListener('click', function () {
         setTimeout(function () {
           isDark = !isDark;
-          screenshot.src = isDark ? 'screenshot-dark.avif' : 'screenshot-light.avif';
+          screenshot.src = isDark ? 'src/assets/screenshot-dark.avif' : 'src/assets/screenshot-light.avif';
           console.log('Switched to:', isDark ? 'dark' : 'light');
         }, 100);
       });

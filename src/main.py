@@ -372,7 +372,7 @@ def setup_page_config(page: ft.Page, saved_config: Optional[dict]) -> None:
     page.window.min_height = 700
     page.window.width = 700
     page.window.height = 700
-    page.window.icon = os.path.abspath("favicon.ico")
+    page.window.icon = os.path.abspath("src/assets/icon.ico")
     page.title = "Barcode Printer"
     saved_theme = saved_config.get("theme_mode") if saved_config else "dark"
     page.theme_mode = ft.ThemeMode.DARK if saved_theme == "dark" else ft.ThemeMode.LIGHT
