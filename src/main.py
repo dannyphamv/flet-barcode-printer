@@ -147,8 +147,6 @@ def _print_image_gdi(img: Image.Image, printer_name: str) -> None:
 
         x1 = (pw - target_w) // 2
         y1 = (ph - target_h) // 2
-        x2 = x1 + target_w
-        y2 = y1 + target_h
 
         # Build a DIB section and StretchDIBits to the printer DC
         w, h = img.size
@@ -568,7 +566,7 @@ def main(page: ft.Page) -> None:
                     page.update()
                     page.show_dialog(
                         ft.SnackBar(
-                            ft.Text(f"Print failed: {str(exc)}"),
+                            ft.Text("Print failed!"),
                             bgcolor=ft.Colors.ERROR,
                         )
                     )
