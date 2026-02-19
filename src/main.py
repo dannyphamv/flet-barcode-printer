@@ -1,26 +1,24 @@
 """Barcode Printer GUI using Flet framework."""
 
-import json
-import os
 import base64
-import threading
-import tempfile
 import ctypes
 import ctypes.wintypes
-import struct
+import json
+import os
+import tempfile
+import threading
+from dataclasses import dataclass
+from datetime import datetime
+from functools import lru_cache
 from io import BytesIO
 from pathlib import Path
-from datetime import datetime
-from dataclasses import dataclass
-from functools import lru_cache
 from typing import Optional
 
+import barcode as python_barcode
 import flet as ft
 import flet_datatable2 as ftd
-
-import barcode as python_barcode
-from barcode.writer import ImageWriter
 import qrcode
+from barcode.writer import ImageWriter
 from PIL import Image
 
 ctypes.windll.shcore.SetProcessDpiAwareness(2)  # PROCESS_PER_MONITOR_DPI_AWARE
@@ -563,7 +561,7 @@ def main(page: ft.Page) -> None:
                     0.5, lambda: page.run_thread(hide_progress_success)
                 ).start()
 
-            except Exception as exc:
+            except Exception:
 
                 def show_error():
                     progress_bar.color = ft.Colors.ERROR
