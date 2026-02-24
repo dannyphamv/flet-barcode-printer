@@ -1,18 +1,17 @@
 [Setup]
 AppName=Barcode Printer
-AppVersion=0.1.0
-AppVerName=Barcode Printer 0.1.0
+AppVersion=1.0
+AppVerName=Barcode Printer 1.0
 AppPublisher=Danny Pham
-AppPublisherURL=https://dannyphamv.github.io/flet-barcode-printer/
-AppSupportURL=https://dannyphamv.github.io/flet-barcode-printer/
-AppUpdatesURL=https://dannyphamv.github.io/flet-barcode-printer/
+AppPublisherURL=https://github.com/dannyphamv/flet-barcode-printer
 AppCopyright=Copyright (C) 2026 Danny Pham
 PrivilegesRequired=lowest
-PrivilegesRequiredOverridesAllowed=dialog
 CloseApplications=yes
 CloseApplicationsFilter=BarcodePrinter.exe
 RestartApplications=yes
 LicenseFile=LICENSE.txt
+AppId={{9fb278e0-fa2c-4cb7-b7e7-727595cb12ba}}
+AppComments=A modern barcode and QR code printer for Windows
 
 ; Install paths
 DefaultDirName={autopf}\Barcode Printer
@@ -39,11 +38,11 @@ UninstallDisplayName=Barcode Printer
 AppMutex=BarcodePrinterSetupMutex
 
 ; Version info shown in installer EXE properties
-VersionInfoVersion=0.1.0
+VersionInfoVersion=1.0
 VersionInfoCompany=Danny Pham
 VersionInfoDescription=Barcode Printer Installer
 VersionInfoProductName=Barcode Printer
-VersionInfoProductVersion=0.1.0
+VersionInfoProductVersion=1.0
 
 ; 64-bit install
 ArchitecturesInstallIn64BitMode=x64compatible
@@ -51,11 +50,26 @@ ArchitecturesInstallIn64BitMode=x64compatible
 ; Modern wizard UI
 WizardStyle=dynamic
 
+[Code]
+function InitializeSetup(): Boolean;
+begin
+  if not IsWin64 then
+  begin
+    MsgBox('Barcode Printer requires a 64-bit version of Windows.', mbError, MB_OK);
+    Result := False;
+  end else
+    Result := True;
+end;
+
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional icons:"
+Name: "startupicon"; Description: "Start automatically with Windows"; GroupDescription: "Startup:"; Flags: unchecked
+
+[Registry]
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "BarcodePrinter"; ValueData: """{app}\BarcodePrinter.exe"""; Tasks: startupicon; Flags: uninsdeletevalue
 
 [Files]
 Source: "build\windows\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -72,3 +86,5 @@ Filename: "{app}\BarcodePrinter.exe"; Description: "Launch Barcode Printer"; Fla
 Type: filesandordirs; Name: "{app}\logs"
 Type: filesandordirs; Name: "{app}\cache"
 Type: filesandordirs; Name: "{userappdata}\BarcodePrinter"
+Type: files; Name: "{app}\*.pyc"
+Type: filesandordirs; Name: "{app}\__pycache__"
